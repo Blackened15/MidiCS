@@ -9,7 +9,29 @@ namespace MidiCS
 {
   public class MidiFileReader
   {
-    public static MidiFile FromBytes(byte[] bytes)
+    private static string DecodeText(byte[] bytes)
+    {
+        // Try strict UTF-8 first (throws on invalid sequences).
+        try
+        {
+            var utf8 = new System.Text.UTF8Encoding(false, true);
+            return utf8.GetString(bytes);
+        }
+        catch (System.ArgumentException)
+        {
+            // Invalid UTF-8 -> fall back to Windows-1252 (typical single-byte MIDI text)
+            try
+            {
+                return System.Text.Encoding.GetEncoding(1252).GetString(bytes);
+            }
+            catch
+            {
+                // Last resort: 28591 (Latin1) to preserve raw byte->codepoint mapping
+                return System.Text.Encoding.GetEncoding(28591).GetString(bytes);
+            }
+        }
+    }
+        public static MidiFile FromBytes(byte[] bytes)
     {
       using (var s = new MemoryStream(bytes))
         return FromStream(s);
@@ -122,19 +144,40 @@ namespace MidiCS
               throw new InvalidDataException("Sequence number events must have 2 bytes of data; this one has " + length);
             return new SequenceNumber(deltaTime, s.ReadUInt16BE());
           case MetaEventType.TextEvent:
-            return new TextEvent(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new TextEvent(deltaTime, DecodeText(data));
+            }
           case MetaEventType.CopyrightNotice:
-            return new CopyrightNotice(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new CopyrightNotice(deltaTime, DecodeText(data));
+            }
           case MetaEventType.TrackName:
-            return new TrackName(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new TrackName(deltaTime, DecodeText(data));
+            }
           case MetaEventType.InstrumentName:
-            return new InstrumentName(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new InstrumentName(deltaTime, DecodeText(data));
+            }
           case MetaEventType.Lyric:
-            return new Lyric(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new Lyric(deltaTime, DecodeText(data));
+            }
           case MetaEventType.Marker:
-            return new Marker(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new Marker(deltaTime, DecodeText(data));
+            }
           case MetaEventType.CuePoint:
-            return new CuePoint(deltaTime, Encoding.ASCII.GetString(s.ReadBytes(length)));
+            {
+                var data = s.ReadBytes(length);
+                return new CuePoint(deltaTime, DecodeText(data));
+            }
           case MetaEventType.ChannelPrefix:
             if (length != 1)
               throw new InvalidDataException("Channel prefix events must have 1 byte of data; this one has " + length);
